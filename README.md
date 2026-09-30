@@ -95,33 +95,53 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    USER["User"] --> UI["React Dashboard"]
-    UI --> API["FastAPI"]
-    API --> BUS["Service Bus"]
-    BUS --> WORKER["Agent Worker"]
-    WORKER --> ORCH["CortexFlow Orchestrator"]
+    USER["User"]
+    UI["React Dashboard"]
+    API["FastAPI Backend"]
+    BUS["Service Bus"]
+    WORKER["Agent Worker"]
+    ORCH["CortexFlow Orchestrator"]
 
-    ORCH --> AGENT["AI Agents"]
-    AGENT --> LLM["Azure OpenAI / Ollama"]
-    LLM --> RESULT["Structured Result"]
+    AGENT["AI Agents"]
+    LLM["Azure OpenAI / Ollama"]
+    RESULT["Structured Result"]
+
+    SECURITY["Security / RBAC"]
+    POLICY["Policy Engine"]
+    WORKFLOW["Workflow Engine"]
+    APPROVAL["Human Approval"]
+
+    TOOLS["Tool Registry"]
+    ENTERPRISE["HR / ERP / CRM / Enterprise APIs"]
+
+    COSMOS[("Cosmos DB")]
+    REDIS[("Redis")]
+    BLOB[("Blob Storage")]
+    OBS["Observability"]
+
+    USER --> UI
+    UI --> API
+    API --> BUS
+    BUS --> WORKER
+    WORKER --> ORCH
+
+    ORCH --> AGENT
+    AGENT --> LLM
+    LLM --> RESULT
     RESULT --> ORCH
 
-    ORCH --> POLICY["Policy Engine"]
-    ORCH --> WORKFLOW["Workflow Engine"]
-    ORCH --> SECURITY["Security / RBAC"]
-    ORCH --> TOOLS["Tool Registry"]
-
-    POLICY --> APPROVAL["Human Approval"]
+    ORCH --> SECURITY
+    SECURITY --> POLICY
+    POLICY --> WORKFLOW
     WORKFLOW --> APPROVAL
-    APPROVAL --> ORCH
+    APPROVAL --> TOOLS
+    TOOLS --> ENTERPRISE
 
-    TOOLS --> ENTERPRISE["HR / ERP / CRM / Enterprise APIs"]
+    ORCH --> COSMOS
+    ORCH --> REDIS
+    API --> BLOB
 
-    ORCH <--> COSMOS[("Cosmos DB")]
-    ORCH <--> REDIS[("Redis")]
-    API --> BLOB[("Blob Storage")]
-
-    API --> OBS["Observability"]
+    API --> OBS
     ORCH --> OBS
     WORKER --> OBS
 ```
