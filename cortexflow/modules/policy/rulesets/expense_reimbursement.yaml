@@ -1,0 +1,122 @@
+# Finance: expense reimbursement authorization.
+#
+# Rules are evaluated in order against facts assembled by the orchestrator.
+# Every effect is combined conservatively (DENY > REQUIRE_APPROVAL > ALLOW),
+# so a single risk signal is enough to route a case to a human.
+name: expense_reimbursement_policy
+version: 1
+description: Determines whether an expense may be reimbursed automatically.
+
+# Fail closed: anything the rules did not anticipate goes to a person.
+default_effect: REQUIRE_APPROVAL
+default_risk: MEDIUM
+default_required_roles: [finance_manager]
+
+rules:
+  # --- hard denials (evaluated first, short-circuit) ---------------------
+  - id: employee_inactive
+    description: Reimbursements are only payable to active employees.
+    when: "facts.employee_active == False"
+    effect: DENY
+    risk: HIGH
+    message: Employee record is not active.
+    stop_on_match: true
+
+  - id: duplicate_claim
+    description: The same receipt has already been reimbursed.
+    when: "facts.duplicate_detected == True"
+    effect: DENY
+    risk: HIGH
+    message: A matching expense has already been reimbursed.
+    stop_on_match: true
+
+  - id: policy_excluded_category
+    description: Certain categories are never reimbursable.
+    when: "facts.category in ['alcohol', 'entertainment', 'personal']"
+    effect: DENY
+    risk: MEDIUM
+    message: Expense category is excluded by company policy.
+    stop_on_match: true
+
+  # --- escalations -------------------------------------------------------
+  - id: exceeds_employee_limit
+    description: Above the employee's own per-claim limit.
+    when: "facts.amount > facts.employee_limit"
+    effect: REQUIRE_APPROVAL
+    risk: HIGH
+    required_roles: [finance_manager]
+    message: Amount exceeds the employee's per-claim limit.
+
+  - id: exceeds_auto_approval_threshold
+    description: Above the routine auto-approval band.
+    when: "facts.amount > facts.auto_approval_threshold"
+    effect: REQUIRE_APPROVAL
+    risk: MEDIUM
+    required_roles: [finance_manager]
+    message: Amount exceeds the automatic approval threshold.
+
+  - id: high_value_claim
+    description: Materially large claims always get a second pair of eyes.
+    when: "facts.amount >= 100000"
+    effect: REQUIRE_APPROVAL
+    risk: CRITICAL
+    required_roles: [finance_manager]
+    message: High-value claim requires senior finance approval.
+
+  - id: low_extraction_confidence
+    description: We are not confident we read the document correctly.
+    when: "facts.extraction_confidence < 0.85"
+    effect: REQUIRE_APPROVAL
+    risk: MEDIUM
+    required_roles: [finance_analyst, finance_manager]
+    message: Document extraction confidence is below the automation threshold.
+
+  - id: incomplete_data
+    description: Required fields are missing from the claim.
+    when: "facts.data_complete == False"
+    effect: REQUIRE_APPROVAL
+    risk: MEDIUM
+    required_roles: [finance_analyst, finance_manager]
+    message: Claim is missing required information.
+
+  - id: receipt_issues
+    description: Receipt validation raised anomalies.
+    when: "facts.validation_issue_count > 0"
+    effect: REQUIRE_APPROVAL
+    risk: HIGH
+    required_roles: [finance_manager]
+    message: Receipt validation raised anomalies that need review.
+
+  - id: budget_exhausted
+    description: The cost centre has insufficient remaining budget.
+    when: "facts.budget_available < facts.amount"
+    effect: REQUIRE_APPROVAL
+    risk: HIGH
+    required_roles: [finance_manager]
+    message: Cost centre has insufficient remaining budget.
+
+  - id: agent_recommends_review
+    description: The decision agent itself declined to decide.
+    when: "facts.agent_recommendation in ['MANUAL_REVIEW', 'REJECT']"
+    effect: REQUIRE_APPROVAL
+    risk: MEDIUM
+    required_roles: [finance_manager]
+    message: The decision agent recommended human review.
+
+  # --- the automation path ----------------------------------------------
+  # Reached only when every signal above is clean.
+  - id: routine_claim
+    description: Small, complete, validated, in-budget claim from an active employee.
+    when: >
+      facts.employee_active == True
+      and facts.amount <= facts.auto_approval_threshold
+      and facts.amount <= facts.employee_limit
+      and facts.extraction_confidence >= 0.85
+      and facts.data_complete == True
+      and facts.validation_issue_count == 0
+      and facts.duplicate_detected == False
+      and facts.budget_available >= facts.amount
+      and facts.agent_recommendation == 'APPROVE'
+    effect: ALLOW
+    risk: LOW
+    message: Routine claim within all automated limits.

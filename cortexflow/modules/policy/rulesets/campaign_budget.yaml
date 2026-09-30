@@ -1,0 +1,56 @@
+# Marketing: campaign budget change authorization.
+name: campaign_budget_policy
+version: 1
+description: Determines whether a campaign budget change may be applied automatically.
+
+default_effect: REQUIRE_APPROVAL
+default_risk: MEDIUM
+default_required_roles: [marketing_manager]
+
+rules:
+  - id: campaign_inactive
+    when: "facts.campaign_active == False"
+    effect: DENY
+    risk: MEDIUM
+    message: Campaign is not active.
+    stop_on_match: true
+
+  - id: exceeds_annual_budget
+    when: "facts.proposed_budget > facts.annual_budget_remaining"
+    effect: DENY
+    risk: HIGH
+    message: Proposed budget exceeds the remaining annual allocation.
+    stop_on_match: true
+
+  - id: large_increase
+    when: "facts.increase_pct > 25"
+    effect: REQUIRE_APPROVAL
+    risk: HIGH
+    required_roles: [marketing_manager]
+    message: Budget increase exceeds 25 percent.
+
+  - id: poor_performance
+    description: Do not scale spend on a campaign that is underperforming.
+    when: "facts.roi < 1.0 and facts.increase_pct > 0"
+    effect: REQUIRE_APPROVAL
+    risk: HIGH
+    required_roles: [marketing_manager]
+    message: Campaign ROI is below break-even.
+
+  - id: low_confidence_analysis
+    when: "facts.analysis_confidence < 0.85"
+    effect: REQUIRE_APPROVAL
+    risk: MEDIUM
+    required_roles: [marketing_analyst, marketing_manager]
+    message: Campaign analysis confidence is below the automation threshold.
+
+  - id: routine_adjustment
+    when: >
+      facts.campaign_active == True
+      and facts.increase_pct <= 25
+      and facts.roi >= 1.0
+      and facts.analysis_confidence >= 0.85
+      and facts.proposed_budget <= facts.annual_budget_remaining
+    effect: ALLOW
+    risk: LOW
+    message: Routine budget adjustment on a performing campaign.

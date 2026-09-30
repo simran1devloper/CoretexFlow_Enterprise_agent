@@ -1,0 +1,87 @@
+# HR: employee onboarding authorization.
+name: employee_onboarding_policy
+version: 1
+description: Determines whether a candidate record may be created automatically.
+
+default_effect: REQUIRE_APPROVAL
+default_risk: MEDIUM
+default_required_roles: [hr_manager]
+
+# Grade arrives as either a level code or a job title, depending on which HR
+# system exported the file. The rule below compares one clean value; this is
+# where the two vocabularies are reconciled, and where a new title is added.
+#
+# Anything unlisted becomes `unknown`, which satisfies neither `senior` nor
+# `standard`, so an unrecognised title escalates to a person instead of being
+# auto-approved because nobody had got around to mapping it.
+derive:
+  - fact: seniority
+    source: grade
+    default: unknown
+    values:
+      executive:
+        [L9, EXEC, Executive, "Chief Executive", CTO, CFO, COO, VP, "Vice President"]
+      senior:
+        [L7, L8, Director, "Senior Director", Manager, "Senior Manager",
+         "Finance Manager", "HR Manager", "Product Manager", "Sales Lead",
+         "Staff Engineer", "Principal Engineer", "Head of Engineering"]
+      standard:
+        [L1, L2, L3, L4, L5, L6, Analyst, Consultant, Contractor, Designer,
+         Engineer, "Senior Engineer", "Data Scientist", Recruiter, Associate]
+
+rules:
+  - id: right_to_work_missing
+    description: Employment cannot proceed without verified right-to-work documents.
+    when: "facts.right_to_work_verified == False"
+    effect: DENY
+    risk: CRITICAL
+    message: Right-to-work documentation is missing or unverified.
+    stop_on_match: true
+
+  - id: background_check_failed
+    when: "facts.background_check == 'FAILED'"
+    effect: DENY
+    risk: CRITICAL
+    message: Background verification failed.
+    stop_on_match: true
+
+  - id: background_check_pending
+    when: "facts.background_check != 'PASSED'"
+    effect: REQUIRE_APPROVAL
+    risk: HIGH
+    required_roles: [hr_manager]
+    message: Background verification is not yet complete.
+
+  - id: missing_documents
+    when: "facts.missing_document_count > 0"
+    effect: REQUIRE_APPROVAL
+    risk: MEDIUM
+    required_roles: [hr_specialist, hr_manager]
+    message: Required onboarding documents are missing.
+
+  - id: low_extraction_confidence
+    when: "facts.extraction_confidence < 0.9"
+    effect: REQUIRE_APPROVAL
+    risk: MEDIUM
+    required_roles: [hr_specialist, hr_manager]
+    message: Document extraction confidence is below the HR automation threshold.
+
+  # Senior hires always involve a human, regardless of how clean the file is.
+  - id: senior_grade
+    description: Senior and executive hires always get a second pair of eyes.
+    when: "facts.seniority in ['senior', 'executive']"
+    effect: REQUIRE_APPROVAL
+    risk: HIGH
+    required_roles: [hr_manager]
+    message: Senior appointments require HR manager approval.
+
+  - id: standard_hire
+    when: >
+      facts.right_to_work_verified == True
+      and facts.background_check == 'PASSED'
+      and facts.missing_document_count == 0
+      and facts.extraction_confidence >= 0.9
+      and facts.seniority == 'standard'
+    effect: ALLOW
+    risk: LOW
+    message: Standard hire with complete, verified documentation.
