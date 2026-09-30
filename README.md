@@ -91,60 +91,7 @@ flowchart TB
     REGISTRY --> ENTERPRISE
 ```
 
-### Runtime flow
 
-```mermaid
-flowchart TB
-    USER["User"]
-    UI["React Dashboard"]
-    API["FastAPI Backend"]
-    BUS["Service Bus"]
-    WORKER["Agent Worker"]
-    ORCH["CortexFlow Orchestrator"]
-
-    AGENT["AI Agents"]
-    LLM["Azure OpenAI / Ollama"]
-    RESULT["Structured Result"]
-
-    SECURITY["Security / RBAC"]
-    POLICY["Policy Engine"]
-    WORKFLOW["Workflow Engine"]
-    APPROVAL["Human Approval"]
-
-    TOOLS["Tool Registry"]
-    ENTERPRISE["HR / ERP / CRM / Enterprise APIs"]
-
-    COSMOS[("Cosmos DB")]
-    REDIS[("Redis")]
-    BLOB[("Blob Storage")]
-    OBS["Observability"]
-
-    USER --> UI
-    UI --> API
-    API --> BUS
-    BUS --> WORKER
-    WORKER --> ORCH
-
-    ORCH --> AGENT
-    AGENT --> LLM
-    LLM --> RESULT
-    RESULT --> ORCH
-
-    ORCH --> SECURITY
-    SECURITY --> POLICY
-    POLICY --> WORKFLOW
-    WORKFLOW --> APPROVAL
-    APPROVAL --> TOOLS
-    TOOLS --> ENTERPRISE
-
-    ORCH --> COSMOS
-    ORCH --> REDIS
-    API --> BLOB
-
-    API --> OBS
-    ORCH --> OBS
-    WORKER --> OBS
-```
 
 The system deliberately separates AI reasoning from enterprise execution. Agents interpret requests and return structured results; the orchestrator and control layers determine what is allowed to happen.
 
